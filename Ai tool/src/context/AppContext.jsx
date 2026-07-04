@@ -53,6 +53,10 @@ const INITIAL_STATE = {
   },
   settings: DEFAULT_SETTINGS,
   sections: INITIAL_SECTIONS,
+  // Flat lookup table built from Ring Beams schedule extraction.
+  // Keys are normalised beam marks (uppercase, no hyphens/spaces).
+  // Floor tab population happens separately via REPLACE_RING_BEAM_FLOOR.
+  extractedBeamSchedule: {},
   activeSection: 'footingBoxes',
   activeFloor: 'foundation',
   appView: 'dashboard', // 'dashboard' | 'setup' | 'tool'
@@ -233,6 +237,16 @@ function reducer(state, action) {
     case 'UPDATE_COLUMN_FLOOR': {
       const { floorId, data } = action.payload;
       return updateColumnFloor(state, floorId, (fd) => ({ ...fd, ...data }));
+    }
+
+    // Store beam schedule lookup table (mark → properties) without touching floor tabs
+    case 'SET_EXTRACTED_BEAM_SCHEDULE':
+      return { ...state, extractedBeamSchedule: action.payload };
+
+    // Replace all members of one ring beam floor tab (used by floor plan import)
+    case 'REPLACE_RING_BEAM_FLOOR': {
+      const { floorId, members } = action.payload;
+      return updateBeamFloor(state, 'ringBeams', floorId, fd => ({ ...fd, members }));
     }
 
     // ── Ring Beams ──

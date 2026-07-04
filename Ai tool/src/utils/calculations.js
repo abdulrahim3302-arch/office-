@@ -75,8 +75,8 @@ export function calcFootingBox(member, settings) {
     details.bottomAlongW = { b2Leg, straight, barLenMm, barLenM, count, kgm, weight };
   }
 
-  // ── Top steel (eccentric / combined / lift) ──
-  const hasTop = ['eccentric', 'combined', 'lift'].includes(type);
+  // ── Top steel (eccentric / combined / lift, or isolated with optional top) ──
+  const hasTop = ['eccentric', 'combined', 'lift'].includes(type) || !!(topAlongL?.dia || topAlongW?.dia);
   if (hasTop && topAlongL?.dia && topAlongL?.spacing) {
     const straight = L - cover2;
     const barLenMm = 2 * b1Leg + straight;

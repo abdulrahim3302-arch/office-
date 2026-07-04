@@ -17,8 +17,25 @@ const EMPTY_MEMBER = {
 
 function FootingForm({ initial, onSave, onClose }) {
   const [m, setM] = useState({ ...EMPTY_MEMBER, ...initial });
-  const needsTop = m.type !== 'isolated';
+  const isIsolated = m.type === 'isolated';
+  const hasExistingTop = !!(m.topAlongL || m.topAlongW);
+  const [showTop, setShowTop] = useState(hasExistingTop || !isIsolated);
   const set = (k, v) => setM((prev) => ({ ...prev, [k]: v }));
+
+  function handleTypeChange(val) {
+    set('type', val);
+    if (val !== 'isolated') setShowTop(true);
+  }
+
+  function toggleTop(val) {
+    setShowTop(val);
+    if (!val) setM((p) => ({ ...p, topAlongL: null, topAlongW: null }));
+    else setM((p) => ({
+      ...p,
+      topAlongL: p.topAlongL || { dia: 'Y16', spacing: 200 },
+      topAlongW: p.topAlongW || { dia: 'Y16', spacing: 200 },
+    }));
+  }
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(m); }} className="space-y-5">
@@ -30,7 +47,7 @@ function FootingForm({ initial, onSave, onClose }) {
         </div>
         <div>
           <label className="label">Type</label>
-          <select className="input-dark text-sm" value={m.type} onChange={(e) => set('type', e.target.value)}>
+          <select className="input-dark text-sm" value={m.type} onChange={(e) => handleTypeChange(e.target.value)}>
             {FOOTING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
@@ -72,24 +89,41 @@ function FootingForm({ initial, onSave, onClose }) {
         </div>
       </div>
 
-      {needsTop && (
-        <div className="border-t border-gray-700 pt-4 space-y-3">
+      <div className="border-t border-gray-700 pt-4">
+        <div className="flex items-center gap-3 mb-3">
           <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Top Reinforcement</p>
-          <div className="grid grid-cols-2 gap-3">
-            <BarSpecInput
-              label="Top Along L"
-              value={m.topAlongL || {}}
-              onChange={(v) => set('topAlongL', v.dia ? v : null)}
-            />
-            <BarSpecInput
-              label="Top Along W"
-              value={m.topAlongW || {}}
-              onChange={(v) => set('topAlongW', v.dia ? v : null)}
-            />
-          </div>
-          <p className="text-xs text-gray-600">Chair bars (CH1) added automatically for {m.type} footings.</p>
+          {isIsolated && (
+            <button
+              type="button"
+              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                showTop
+                  ? 'border-cyan-600 text-cyan-400 bg-cyan-900/30'
+                  : 'border-gray-600 text-gray-500 hover:border-gray-500'
+              }`}
+              onClick={() => toggleTop(!showTop)}
+            >
+              {showTop ? '✓ On' : '+ Add'}
+            </button>
+          )}
         </div>
-      )}
+        {showTop && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <BarSpecInput
+                label="Top Along L"
+                value={m.topAlongL || {}}
+                onChange={(v) => set('topAlongL', v.dia ? v : null)}
+              />
+              <BarSpecInput
+                label="Top Along W"
+                value={m.topAlongW || {}}
+                onChange={(v) => set('topAlongW', v.dia ? v : null)}
+              />
+            </div>
+            <p className="text-xs text-gray-600">Chair bars (CH1) added automatically.</p>
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="label">Quantity</label>
@@ -155,6 +189,33 @@ function FormulaPanel({ member, result }) {
             <p>  Straight = B − {cover2} = {member.width} − {cover2} = {d.straight}mm</p>
             <p>  Bar = 2×{d.b2Leg} + {d.straight} = {d.barLenMm}mm → <span className="text-cyan-300">{d.barLenM}m</span></p>
             <p>  Count = ⌈(A − {cover2}) / {member.bottomAlongW?.spacing}⌉ = ⌈({member.length}−{cover2})/{member.bottomAlongW?.spacing}⌉ = <span className="text-cyan-300">{d.count} bars</span></p>
+            <p>  Wt = {d.count}×{d.barLenM}×{d.kgm.toFixed(3)} × {member.quantity}no = <span className="text-cyan-400 font-bold">{d.weight.toFixed(2)} kg</span></p>
+          </div>
+        );
+      })()}
+
+      {details.topAlongL && (() => {
+        const d = details.topAlongL;
+        return (
+          <div className="border-l-2 border-blue-700 pl-3 space-y-0.5">
+            <p className="text-gray-300">T1 — Top Along L ({member.topAlongL?.dia} @{member.topAlongL?.spacing}):</p>
+            <p>  Straight = A − {cover2} = {member.length} − {cover2} = {d.straight}mm</p>
+            <p>  Bar = 2×{d.b1Leg} + {d.straight} = {d.barLenMm}mm → <span className="text-cyan-300">{d.barLenM}m</span></p>
+            <p>  Count = ⌈(B − {cover2}) / {member.topAlongL?.spacing}⌉ = <span className="text-cyan-300">{d.count} bars</span></p>
+            <p>  Wt = {d.count}×{d.barLenM}×{d.kgm.toFixed(3)} × {member.quantity}no = <span className="text-cyan-400 font-bold">{d.weight.toFixed(2)} kg</span></p>
+          </div>
+        );
+      })()}
+
+      {details.topAlongW && (() => {
+        const d = details.topAlongW;
+        return (
+          <div className="border-l-2 border-blue-600 pl-3 space-y-0.5">
+            <p className="text-gray-300">T2 — Top Along W ({member.topAlongW?.dia} @{member.topAlongW?.spacing}):</p>
+            <p>  B2 leg = {d.b2Leg}mm</p>
+            <p>  Straight = B − {cover2} = {member.width} − {cover2} = {d.straight}mm</p>
+            <p>  Bar = 2×{d.b2Leg} + {d.straight} = {d.barLenMm}mm → <span className="text-cyan-300">{d.barLenM}m</span></p>
+            <p>  Count = ⌈(A − {cover2}) / {member.topAlongW?.spacing}⌉ = <span className="text-cyan-300">{d.count} bars</span></p>
             <p>  Wt = {d.count}×{d.barLenM}×{d.kgm.toFixed(3)} × {member.quantity}no = <span className="text-cyan-400 font-bold">{d.weight.toFixed(2)} kg</span></p>
           </div>
         );
