@@ -197,6 +197,23 @@ function reducer(state, action) {
       };
     }
 
+    // Apply AI-counted quantities (from foundation layout plan) onto matching
+    // footing marks by name — leaves non-matching members untouched.
+    case 'SET_FOOTING_QUANTITIES': {
+      const counts = action.payload; // { "F1": 5, ... } — keys are raw mark names
+      const normCounts = {};
+      for (const [mark, qty] of Object.entries(counts)) {
+        normCounts[mark.toUpperCase().replace(/[-\s]/g, '')] = qty;
+      }
+      return updateSection(state, 'footingBoxes', (s) => ({
+        ...s,
+        members: s.members.map((m) => {
+          const key = String(m.name || '').toUpperCase().replace(/[-\s]/g, '');
+          return key in normCounts ? { ...m, quantity: normCounts[key] } : m;
+        }),
+      }));
+    }
+
     // ── Footing Boxes ──
     case 'ADD_FOOTING':
       return updateSection(state, 'footingBoxes', (s) => ({ ...s, members: [...s.members, action.payload] }));

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Home, Building2 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -98,7 +99,7 @@ export function NewProjectPage() {
                     }`}
                     onClick={() => set('storeys', n)}
                   >
-                    <div className="text-lg mb-0.5">{n === 2 ? '🏠' : '🏢'}</div>
+                    <div className="flex justify-center mb-0.5">{n === 2 ? <Home className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}</div>
                     {n} Storeys
                   </button>
                 ))}

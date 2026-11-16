@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext.jsx';
 import { NAV_SECTIONS } from './utils/constants.js';
 import { Dashboard } from './components/Dashboard.jsx';
@@ -94,7 +95,9 @@ function AppShell() {
               }`}
               onClick={() => setSection(item.id)}
             >
-              <span className="text-base w-5 text-center">{item.icon}</span>
+              <span className="text-base w-5 text-center flex items-center justify-center">
+                {typeof item.icon === 'string' ? item.icon : <item.icon className="w-4 h-4" />}
+              </span>
               <span className="truncate">{item.label}</span>
             </button>
           ))}
@@ -105,7 +108,9 @@ function AppShell() {
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
             onClick={() => setShowSettings(true)}
           >
-            <span className="text-base w-5 text-center">⚙</span>
+            <span className="text-base w-5 text-center flex items-center justify-center">
+              <SettingsIcon className="w-4 h-4" />
+            </span>
             <span>Engineering Settings</span>
           </button>
         </div>
@@ -131,8 +136,8 @@ function AppShell() {
               <span>{project.name}</span>
             </div>
           )}
-          <button className="btn-ghost text-xs py-1.5 px-3" onClick={() => setShowSettings(true)}>
-            ⚙ Settings
+          <button className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5" onClick={() => setShowSettings(true)}>
+            <SettingsIcon className="w-3.5 h-3.5" /> Settings
           </button>
         </header>
 

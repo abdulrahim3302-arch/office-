@@ -1,3 +1,5 @@
+import { Loader2, CheckCircle2, Ruler } from 'lucide-react';
+
 export function UploadDropzone({ data, fileName, loading, inputRef, onFiles }) {
   return (
     <div
@@ -33,7 +35,9 @@ export function UploadDropzone({ data, fileName, loading, inputRef, onFiles }) {
 function LoadingState() {
   return (
     <div>
-      <div className="spinner">⚙️</div>
+      <div className="spinner" style={{ display: "flex", justifyContent: "center", marginBottom: "8px", color: "#C4873A" }}>
+        <Loader2 className="animate-spin" size={28} />
+      </div>
       <div style={{ color: "#C4873A", fontSize: "14px", fontWeight: 700 }}>Analyzing your drawings...</div>
       <div style={{ color: "#555", fontSize: "11px", marginTop: "4px" }}>
         This takes 30-60 seconds depending on page count
@@ -45,7 +49,9 @@ function LoadingState() {
 function CompleteState({ fileName }) {
   return (
     <div>
-      <div style={{ color: "#5aaa5a", fontSize: "14px", fontWeight: 700 }}>✓ {fileName}</div>
+      <div style={{ color: "#5aaa5a", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+        <CheckCircle2 size={16} /> {fileName}
+      </div>
       <div style={{ color: "#444", fontSize: "11px", marginTop: "4px" }}>Drop a new file to re-analyze</div>
     </div>
   );
@@ -54,7 +60,9 @@ function CompleteState({ fileName }) {
 function EmptyState() {
   return (
     <div>
-      <div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.5 }}>📐</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "8px", opacity: 0.5 }}>
+        <Ruler size={32} />
+      </div>
       <div style={{ color: "#bbb", fontSize: "15px", fontWeight: 700 }}>Drop your structural PDF or drawing here</div>
       <div style={{ color: "#555", fontSize: "12px", marginTop: "6px" }}>
         One file — the AI will find schedules, count members, and calculate everything

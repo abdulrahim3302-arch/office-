@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Building2, MapPin, X } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
-import { loadProjects, deleteProject } from '../utils/storage.js';
+import { loadProjects, deleteProject, exportProjectsFile, importProjectsFile } from '../utils/storage.js';
 
 function storeyLabel(n) {
   return `${n || 2}-Storey Villa`;
@@ -28,9 +29,25 @@ export function Dashboard() {
       .sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0));
   });
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const fileInputRef = useRef(null);
 
   function openProject(entry) {
     dispatch({ type: 'OPEN_PROJECT', payload: entry });
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    importProjectsFile(file).then((count) => {
+      const raw = loadProjects();
+      setProjects(
+        Object.entries(raw)
+          .map(([id, data]) => ({ id, ...data }))
+          .sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0))
+      );
+      alert(`Imported ${count} project(s).`);
+    });
   }
 
   function handleDelete(id, e) {
@@ -57,19 +74,44 @@ export function Dashboard() {
             <div className="text-xs text-gray-500">Bahrain Villa Tool</div>
           </div>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => dispatch({ type: 'SET_APP_VIEW', payload: 'setup' })}
-        >
-          + New Project
-        </button>
+        <div className="flex items-center gap-2">
+          {projects.length > 0 && (
+            <button
+              className="text-xs font-semibold text-gray-400 hover:text-gray-200 border border-gray-800 hover:border-gray-700 rounded-lg px-3 py-2 transition-colors"
+              onClick={exportProjectsFile}
+            >
+              Export
+            </button>
+          )}
+          <button
+            className="text-xs font-semibold text-gray-400 hover:text-gray-200 border border-gray-800 hover:border-gray-700 rounded-lg px-3 py-2 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            className="btn-primary"
+            onClick={() => dispatch({ type: 'SET_APP_VIEW', payload: 'setup' })}
+          >
+            + New Project
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
         {projects.length === 0 ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gray-800 flex items-center justify-center text-3xl mb-5">🏗</div>
+            <div className="w-16 h-16 rounded-2xl bg-gray-800 flex items-center justify-center mb-5 text-gray-400">
+              <Building2 className="w-8 h-8" />
+            </div>
             <h2 className="text-xl font-bold text-gray-200 mb-2">No projects yet</h2>
             <p className="text-sm text-gray-500 mb-8 max-w-xs">
               Create your first project to start calculating steel and concrete quantities.
@@ -119,7 +161,7 @@ export function Dashboard() {
                       </span>
                       {proj.location && (
                         <span className="text-xs text-gray-500 flex items-center gap-1">
-                          <span>📍</span>{proj.location}
+                          <MapPin className="w-3 h-3" />{proj.location}
                         </span>
                       )}
                     </div>
@@ -138,7 +180,7 @@ export function Dashboard() {
                           : 'text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100'
                       }`}
                     >
-                      {isDeleting ? 'Confirm' : '✕'}
+                      {isDeleting ? 'Confirm' : <X className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 );

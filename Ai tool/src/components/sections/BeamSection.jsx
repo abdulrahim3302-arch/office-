@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { useApp, uid } from '../../context/AppContext.jsx';
 import { calcBeam } from '../../utils/calculations.js';
 import { Modal } from '../ui/Modal.jsx';
@@ -421,7 +422,7 @@ export function BeamSection({ title, subtitle, members, addAction, updateAction,
                   />
                 </div>
                 <button className="btn-ghost text-xs py-1 px-2" onClick={() => { setEditing(member); setShowModal(true); }}>Edit</button>
-                <button className="btn-danger text-xs py-1 px-2" onClick={() => deleteMember(member.id)}>✕</button>
+                <button className="btn-danger text-xs py-1 px-2" onClick={() => deleteMember(member.id)}><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
 

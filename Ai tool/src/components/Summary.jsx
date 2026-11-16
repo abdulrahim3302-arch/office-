@@ -1,3 +1,4 @@
+import { BarChart3 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { calcGrandSummary, totalKg } from '../utils/calculations.js';
 import { BAR_TYPES } from '../utils/constants.js';
@@ -38,7 +39,7 @@ export function Summary() {
       <div className="max-w-2xl mx-auto">
         <h2 className="text-xl font-bold text-gray-100 mb-4">Summary</h2>
         <div className="card text-center py-12 text-gray-500">
-          <p className="text-4xl mb-3">📊</p>
+          <p className="flex justify-center mb-3"><BarChart3 className="w-10 h-10" /></p>
           <p>No data yet. Add members in each section to see the summary.</p>
         </div>
       </div>

@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Check, X } from 'lucide-react';
 import { useApp, uid } from '../../context/AppContext.jsx';
 import { calcStripFooting } from '../../utils/calculations.js';
 import { Modal } from '../ui/Modal.jsx';
-import { BarSpecInput } from '../ui/BarSpecInput.jsx';
+import { BarSpecInput, StirrupInput } from '../ui/BarSpecInput.jsx';
 import { SteelBreakdown } from '../ui/SteelBreakdown.jsx';
 import { EditParam } from '../ui/EditParam.jsx';
 import { SaveButton } from '../ui/SaveButton.jsx';
@@ -12,6 +13,7 @@ const EMPTY = {
   bottomAlongW: { dia: 'Y16', spacing: 200 },
   bottomAlongL: { dia: 'Y12', spacing: 200 },
   topAlongW: null, topAlongL: null,
+  stirrups: null,
   runningMeters: 0,
 };
 
@@ -19,6 +21,7 @@ function StripForm({ initial, onSave, onClose }) {
   const [m, setM] = useState({ ...EMPTY, ...initial });
   const needsTop = !!(m.topAlongW || m.topAlongL);
   const [showTop, setShowTop] = useState(needsTop);
+  const [showStirrups, setShowStirrups] = useState(!!m.stirrups);
   const set = (k, v) => setM((p) => ({ ...p, [k]: v }));
 
   function toggleTop(val) {
@@ -29,6 +32,12 @@ function StripForm({ initial, onSave, onClose }) {
       topAlongW: p.topAlongW || { dia: 'Y16', spacing: 200 },
       topAlongL: p.topAlongL || { dia: 'Y12', spacing: 200 },
     }));
+  }
+
+  function toggleStirrups(val) {
+    setShowStirrups(val);
+    if (!val) set('stirrups', null);
+    else set('stirrups', m.stirrups || { dia: 'Y8', spacing: 200, rings: 1 });
   }
 
   return (
@@ -83,7 +92,7 @@ function StripForm({ initial, onSave, onClose }) {
             }`}
             onClick={() => toggleTop(!showTop)}
           >
-            {showTop ? '✓ On' : '+ Add'}
+            {showTop ? <span className="flex items-center gap-1"><Check className="w-3 h-3" /> On</span> : '+ Add'}
           </button>
         </div>
         {showTop && (
@@ -99,6 +108,28 @@ function StripForm({ initial, onSave, onClose }) {
               onChange={(v) => set('topAlongL', v.dia ? v : null)}
             />
           </div>
+        )}
+      </div>
+
+      {/* Stirrups / Links toggle */}
+      <div className="border-t border-gray-700 pt-4">
+        <div className="flex items-center gap-3 mb-3">
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Stirrups / Links</p>
+          <button
+            type="button"
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+              showStirrups
+                ? 'border-cyan-600 text-cyan-400 bg-cyan-900/30'
+                : 'border-gray-600 text-gray-500 hover:border-gray-500'
+            }`}
+            onClick={() => toggleStirrups(!showStirrups)}
+          >
+            {showStirrups ? <span className="flex items-center gap-1"><Check className="w-3 h-3" /> On</span> : '+ Add'}
+          </button>
+        </div>
+        {showStirrups && (
+          <StirrupInput label="Links (closed, full length)" value={m.stirrups || {}}
+            onChange={(v) => set('stirrups', v)} />
         )}
       </div>
 
@@ -129,6 +160,8 @@ function FormulaPanel({ member }) {
     let updated;
     if (path === 'cover') updated = { ...s, covers: { ...s.covers, footing: value } };
     else if (path === 'wastage') updated = { ...s, wastage: { ...s.wastage, main: value / 100 } };
+    else if (path === 'hook') updated = { ...s, hookAllowance: value };
+    else if (path === 'wastageStir') updated = { ...s, wastage: { ...s.wastage, stirrup: value / 100 } };
     else updated = s;
     dispatch({ type: 'SET_SETTINGS', payload: updated });
   };
@@ -195,6 +228,18 @@ function FormulaPanel({ member }) {
           <p className="text-gray-300">FB1 — 4×T10 support bars: <span className="text-gray-300 font-bold">{details.fb1.fb1Weight.toFixed(2)} kg</span></p>
         </div>
       )}
+
+      {details.stirrups && (() => {
+        const d = details.stirrups;
+        return (
+          <div className="border-l-2 border-gray-600 pl-3 space-y-0.5">
+            <p className="text-gray-300">Stirrups / Links ({member.stirrups?.dia} @{member.stirrups?.spacing}):</p>
+            <p>  Link cut = 2×({member.width}−{cover2}) + 2×({member.depth}−{cover2}) + <EditParam value={settings.hookAllowance} unit="mm hook" step={10} onChange={(v) => upd('hook', v)} /> = {(d.cutLen*1000).toFixed(0)}mm → <span className="text-cyan-300">{d.cutLen.toFixed(3)}m</span></p>
+            <p>  No. links = ⌊RM×1000 / spacing⌋ + 1 = ⌊{member.runningMeters}×1000 / {member.stirrups?.spacing}⌋ + 1 = <span className="text-cyan-300">{d.numStir}</span></p>
+            <p>  Wt = {d.numStir} × {d.rings}R × {d.cutLen.toFixed(3)} × {d.kgm.toFixed(3)} × <EditParam value={Math.round(settings.wastage.stirrup*100)} unit="% wst" step={1} onChange={(v) => upd('wastageStir', v)} /> = <span className="text-cyan-400 font-bold">{d.weight.toFixed(2)} kg</span></p>
+          </div>
+        );
+      })()}
 
       <p className="text-amber-300 pt-1">
         Concrete = {member.runningMeters}×{member.width/1000}×{member.depth/1000} = {result.concrete.toFixed(3)} m³
@@ -263,6 +308,7 @@ export function StripFootings() {
                 <span className="text-xs text-gray-600">
                   W:{member.bottomAlongW?.dia}@{member.bottomAlongW?.spacing} / L:{member.bottomAlongL?.dia}@{member.bottomAlongL?.spacing}
                   {hasTop && ' + top'}
+                  {member.stirrups && ` + ${member.stirrups.rings}L-${member.stirrups.dia}@${member.stirrups.spacing}`}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -278,7 +324,7 @@ export function StripFootings() {
                 </div>
                 <button className="btn-ghost text-xs py-1 px-2" onClick={() => { setEditing(member); setShowModal(true); }}>Edit</button>
                 <button className="btn-danger text-xs py-1 px-2"
-                  onClick={() => dispatch({ type: 'DELETE_STRIP', payload: member.id })}>✕</button>
+                  onClick={() => dispatch({ type: 'DELETE_STRIP', payload: member.id })}><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
 

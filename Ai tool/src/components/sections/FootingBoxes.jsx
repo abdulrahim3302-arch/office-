@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Check, X } from 'lucide-react';
 import { useApp, uid } from '../../context/AppContext.jsx';
 import { calcFootingBox, getKgPerM } from '../../utils/calculations.js';
 import { FOOTING_TYPES } from '../../utils/constants.js';
@@ -102,7 +103,7 @@ function FootingForm({ initial, onSave, onClose }) {
               }`}
               onClick={() => toggleTop(!showTop)}
             >
-              {showTop ? '✓ On' : '+ Add'}
+              {showTop ? <span className="flex items-center gap-1"><Check className="w-3 h-3" /> On</span> : '+ Add'}
             </button>
           )}
         </div>
@@ -328,7 +329,7 @@ export function FootingBoxes() {
                   </div>
                 </div>
                 <button className="btn-ghost text-xs py-1 px-2" onClick={() => { setEditing(member); setShowModal(true); }}>Edit</button>
-                <button className="btn-danger text-xs py-1 px-2" onClick={() => dispatch({ type: 'DELETE_FOOTING', payload: member.id })}>✕</button>
+                <button className="btn-danger text-xs py-1 px-2" onClick={() => dispatch({ type: 'DELETE_FOOTING', payload: member.id })}><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
 

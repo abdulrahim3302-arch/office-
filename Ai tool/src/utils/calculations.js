@@ -132,11 +132,12 @@ export function calcFootingBox(member, settings) {
 // ─── 2. Strip / Boundary Footings ────────────────────────────────────────────
 
 export function calcStripFooting(member, settings) {
-  const { width: W, depth: D, bottomAlongW, bottomAlongL, topAlongW, topAlongL, runningMeters: RM } = member;
+  const { width: W, depth: D, bottomAlongW, bottomAlongL, topAlongW, topAlongL, stirrups, runningMeters: RM } = member;
   if (!RM || RM <= 0) return { steel: {}, concrete: 0, details: {} };
 
   const cover2 = settings.covers.footing * 2;
   const wst = 1 + settings.wastage.main;
+  const wstStir = 1 + settings.wastage.stirrup;
   const steel = {};
   const details = {};
 
@@ -194,6 +195,17 @@ export function calcStripFooting(member, settings) {
   addWeight(steel, 'T10', fb1Weight);
   details.fb1 = { fb1Weight };
   details.b1Leg = b1Leg;
+
+  // Stirrups / links — closed links tying top & bottom mats, full length uniform spacing
+  if (stirrups?.dia && stirrups?.spacing > 0) {
+    const rings = stirrups.rings || 1;
+    const cutLen = (2 * (W - cover2) + 2 * (D - cover2) + settings.hookAllowance) / 1000;
+    const kgm = getKgPerM(stirrups.dia, settings.kgPerM);
+    const numStir = Math.floor((RM * 1000) / stirrups.spacing) + 1;
+    const weight = numStir * rings * cutLen * kgm * wstStir;
+    addWeight(steel, stirrups.dia, weight);
+    details.stirrups = { spacing: stirrups.spacing, numStir, rings, cutLen, kgm, weight };
+  }
 
   const concrete = RM * (W / 1000) * (D / 1000);
   return { steel, concrete, details };

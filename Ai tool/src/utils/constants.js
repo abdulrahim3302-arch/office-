@@ -1,3 +1,5 @@
+import { ClipboardList, BarChart3, Box, Rows3, Minus, RectangleVertical, Square, Rows4, Grid3x3, Layers } from 'lucide-react';
+
 export const BAR_TYPES = ['Y8', 'T10', 'Y12', 'Y16', 'Y20', 'T25', 'T32'];
 
 export const DEFAULT_KG_PER_M = {
@@ -79,16 +81,16 @@ export const SLAB_TYPES = [
 ];
 
 export const NAV_SECTIONS = [
-  { id: 'project', label: 'Project Setup', icon: '📋' },
-  { id: 'footingBoxes', label: 'Footing Boxes', icon: '⬛' },
-  { id: 'stripFootings', label: 'Strip Footings', icon: '▬' },
-  { id: 'groundBeams', label: 'Ground Beams', icon: '━' },
-  { id: 'columns', label: 'Columns', icon: '▐' },
-  { id: 'ringBeams', label: 'Ring Beams', icon: '◻' },
-  { id: 'floorBeams', label: 'Floor Beams', icon: '━' },
-  { id: 'slabs', label: 'Slabs', icon: '▩' },
-  { id: 'blinding', label: 'Blinding Concrete', icon: '▪' },
-  { id: 'summary', label: 'Summary', icon: '📊' },
+  { id: 'project', label: 'Project Setup', icon: ClipboardList },
+  { id: 'footingBoxes', label: 'Footing Boxes', icon: Box },
+  { id: 'stripFootings', label: 'Strip Footings', icon: Rows3 },
+  { id: 'groundBeams', label: 'Ground Beams', icon: Minus },
+  { id: 'columns', label: 'Columns', icon: RectangleVertical },
+  { id: 'ringBeams', label: 'Ring Beams', icon: Square },
+  { id: 'floorBeams', label: 'Floor Beams', icon: Rows4 },
+  { id: 'slabs', label: 'Slabs', icon: Grid3x3 },
+  { id: 'blinding', label: 'Blinding Concrete', icon: Layers },
+  { id: 'summary', label: 'Summary', icon: BarChart3 },
 ];
 
 export const SAMPLE_FOOTING = {

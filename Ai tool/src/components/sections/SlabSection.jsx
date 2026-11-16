@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { useApp, uid } from '../../context/AppContext.jsx';
 import { calcSlab } from '../../utils/calculations.js';
 import { SLAB_TYPES, BAR_TYPES } from '../../utils/constants.js';
@@ -188,7 +189,7 @@ export function SlabSection() {
                 </div>
                 <button className="btn-ghost text-xs py-1 px-2" onClick={() => { setEditing(member); setShowModal(true); }}>Edit</button>
                 <button className="btn-danger text-xs py-1 px-2"
-                  onClick={() => dispatch({ type: 'DELETE_SLAB', payload: member.id })}>✕</button>
+                  onClick={() => dispatch({ type: 'DELETE_SLAB', payload: member.id })}><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
 

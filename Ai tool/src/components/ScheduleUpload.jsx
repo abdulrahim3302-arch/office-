@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
+import { Sparkles, Map, Ruler, FileText, Image as ImageIcon } from 'lucide-react';
 import { useApp, uid } from '../context/AppContext.jsx';
-import { extractSchedules, extractFloorPlanBeams, SCHEDULE_TYPES } from '../services/extract.js';
+import { extractSchedules, extractFloorPlanBeams, extractFootingQuantities, SCHEDULE_TYPES } from '../services/extract.js';
 import { Modal } from './ui/Modal.jsx';
 
 const API_KEY_LS = 'qs-gemini-key';
@@ -15,14 +16,11 @@ const SECTION_LABELS = {
   slabs:         'Slabs',
 };
 
-// floor key from Gemini → app floorData key
-const FLOOR_ID_MAP = {
-  ground: 'groundFloor',
-  first:  'firstFloor',
-  roof:   'roofFloor',
-  second: 'secondFloor',
-  third:  null,
-};
+// Numeric level for each Gemini floor key — used for positional tab assignment
+const FLOOR_LEVEL = { ground: 0, first: 1, second: 2, third: 3, roof: 4, upper: 5 };
+// Tab slots in order — floors are assigned positionally (lowest level → first slot)
+const TAB_IDS = ['groundFloor', 'firstFloor', 'roofFloor'];
+
 const FLOOR_LABELS = {
   groundFloor: 'Ground Floor',
   firstFloor:  'First Floor',
@@ -53,7 +51,15 @@ function MemberLine({ item, section }) {
   } else if (['groundBeams', 'ringBeams', 'floorBeams'].includes(section)) {
     if (item.topBars)    bars.push(`T: ${item.topBars.count}${item.topBars.dia}`);
     if (item.bottomBars) bars.push(`B: ${item.bottomBars.count}${item.bottomBars.dia}`);
-    if (item.stirrups)   bars.push(`Links: ${item.stirrups.rings || 1}R ${item.stirrups.dia}@${item.stirrups.spacing}`);
+    if (item.hasExtraTop  && item.extraTopSupport?.count  > 0) bars.push(`+ET: ${item.extraTopSupport.count}${item.extraTopSupport.dia}@sup`);
+    if (item.hasExtraBottom && item.extraBottomSupport?.count > 0) bars.push(`+EB: ${item.extraBottomSupport.count}${item.extraBottomSupport.dia}@sup`);
+    if (item.hasWebBars && item.webBars?.count > 0) bars.push(`W: ${item.webBars.count}${item.webBars.dia}`);
+    if (item.stirrups) {
+      const spacing = item.hasMidspanStirrup
+        ? `${item.stirrups.spacing}/${item.stirrupsMidspan?.spacing}`
+        : item.stirrups.spacing;
+      bars.push(`Links: ${item.stirrups.rings || 1}R ${item.stirrups.dia}@${spacing}`);
+    }
   } else if (section === 'stripFootings') {
     if (item.bottomAlongW) bars.push(`W: ${item.bottomAlongW.dia}@${item.bottomAlongW.spacing}`);
     if (item.bottomAlongL) bars.push(`L: ${item.bottomAlongL.dia}@${item.bottomAlongL.spacing}`);
@@ -106,6 +112,7 @@ function ConfirmModal({ extracted, onImport, onClose }) {
           <div className="text-center py-6 text-yellow-400">
             <p className="font-semibold">No members found in the extraction.</p>
             <p className="text-xs text-gray-500 mt-1">Try a higher-resolution image or select the correct schedule type.</p>
+            <p className="text-xs text-gray-600 mt-2 font-mono">Debug: Check browser console (F12 → Console tab) for the raw Gemini response</p>
           </div>
         )}
 
@@ -135,16 +142,25 @@ function ConfirmModal({ extracted, onImport, onClose }) {
 }
 
 // ── Floor plan confirmation modal ─────────────────────────────────────────────
-function FloorPlanConfirmModal({ floors, onImport, onClose }) {
+function FloorPlanConfirmModal({ floors, pagesProcessed, pagesFailed, totalPages, onImport, onClose }) {
   const totalBeams = Object.values(floors).reduce((s, arr) => s + arr.length, 0);
 
   return (
     <Modal title="Floor Plan Review — Ring Beams" onClose={onClose} wide>
       <div className="space-y-4">
-        <p className="text-sm text-gray-400">
-          Matched <span className="text-cyan-300 font-bold">{totalBeams} beam{totalBeams !== 1 ? 's' : ''}</span> from
-          floor plans against your beam schedule. Review per-floor breakdown below.
-          Running Meters will be 0 — enter these in the Ring Beams tabs.
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <span className="text-gray-400">
+            Pages: <span className="text-cyan-300 font-bold">{pagesProcessed} of {totalPages}</span> read successfully
+          </span>
+          {pagesFailed > 0 && (
+            <span className="text-yellow-400 font-semibold">{pagesFailed} page{pagesFailed !== 1 ? 's' : ''} failed — try higher resolution</span>
+          )}
+          <span className="text-gray-400">
+            Beams matched: <span className="text-cyan-300 font-bold">{totalBeams}</span>
+          </span>
+        </div>
+        <p className="text-xs text-gray-500">
+          Running Meters will be 0 — enter these in the Ring Beams tabs after import.
         </p>
 
         <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
@@ -188,10 +204,65 @@ function FloorPlanConfirmModal({ floors, onImport, onClose }) {
   );
 }
 
+// ── Footing quantity confirmation modal ───────────────────────────────────────
+function FootingLayoutConfirmModal({ counts, instancesByMark, pagesProcessed, pagesFailed, totalPages, onImport, onClose }) {
+  const marks = Object.keys(counts).sort();
+  const totalInstances = Object.values(counts).reduce((s, n) => s + n, 0);
+
+  return (
+    <Modal title="Footing Layout Review — Quantities" onClose={onClose} wide>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <span className="text-gray-400">
+            Pages: <span className="text-cyan-300 font-bold">{pagesProcessed} of {totalPages}</span> read successfully
+          </span>
+          {pagesFailed > 0 && (
+            <span className="text-yellow-400 font-semibold">{pagesFailed} page{pagesFailed !== 1 ? 's' : ''} failed — try higher resolution</span>
+          )}
+          <span className="text-gray-400">
+            Footings counted: <span className="text-cyan-300 font-bold">{totalInstances}</span>
+          </span>
+        </div>
+        <p className="text-xs text-gray-500">
+          Each mark's Qty in Footing Boxes will be overwritten with the count below. Counts use the median across 3 AI verification passes per page.
+        </p>
+
+        <div className="bg-gray-900 rounded-xl px-3 py-1 max-h-[50vh] overflow-y-auto">
+          {marks.map(mark => (
+            <div key={mark} className="flex items-baseline gap-3 py-1.5 border-b border-gray-800/60 last:border-0">
+              <span className="text-gray-200 font-bold text-xs w-12 flex-shrink-0">{mark}</span>
+              <span className="text-gray-600 text-xs flex-1 truncate">{(instancesByMark[mark] || []).join(', ')}</span>
+              <span className="text-cyan-400 text-sm font-bold ml-auto">× {counts[mark]}</span>
+            </div>
+          ))}
+        </div>
+
+        {marks.length === 0 && (
+          <div className="text-center py-6 text-yellow-400">
+            <p className="font-semibold">No footing instances were confirmed on this layout.</p>
+            <p className="text-xs text-gray-500 mt-1">Make sure Footing Schedule was extracted first, and try a higher-resolution layout image.</p>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button className="btn-secondary flex-1" onClick={onClose}>Cancel</button>
+          <button
+            className="btn-primary flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40"
+            disabled={marks.length === 0}
+            onClick={onImport}
+          >
+            Apply Quantities →
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScheduleUpload() {
   const { state, dispatch } = useApp();
-  const EMPTY_FILES = { auto: [], footing: [], column: [], ringBeam: [], floorBeam: [], groundBeam: [], floorPlans: [] };
+  const EMPTY_FILES = { auto: [], footing: [], footingLayout: [], column: [], ringBeam: [], floorBeam: [], groundBeam: [], floorPlans: [] };
   const [filesByType, setFilesByType] = useState(EMPTY_FILES);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_LS) || '');
   const [scheduleType, setScheduleType] = useState('auto');
@@ -243,7 +314,28 @@ export function ScheduleUpload() {
     setExtracted(null);
 
     try {
-      if (scheduleType === 'floorPlans') {
+      if (scheduleType === 'footingLayout') {
+        // ── Footing quantity mode: count marks on the foundation layout ──
+        const knownMarks = [...new Set((state.sections.footingBoxes.members || []).map(m => m.name).filter(Boolean))];
+
+        if (knownMarks.length === 0) {
+          addLog('✗ No footing marks found. Switch to Footing Schedule type → upload footing schedule → extract & import first.');
+          setLoading(false);
+          return;
+        }
+
+        addLog(`Footing marks: ${knownMarks.length} mark${knownMarks.length !== 1 ? 's' : ''} (${knownMarks.join(', ')})`);
+
+        const { footingCounts, instancesByMark, pagesProcessed, pagesFailed, totalPages } =
+          await extractFootingQuantities(files, apiKey.trim(), addLog, knownMarks);
+        console.log('[QS] FOOTING QUANTITY RESULT from Gemini:', footingCounts);
+
+        const totalInstances = Object.values(footingCounts).reduce((s, n) => s + n, 0);
+        addLog(`✓ Confirmed ${totalInstances} footing instance${totalInstances !== 1 ? 's' : ''} across ${Object.keys(footingCounts).length} mark${Object.keys(footingCounts).length !== 1 ? 's' : ''}`);
+
+        setExtracted({ _type: 'footingLayout', counts: footingCounts, instancesByMark, pagesProcessed, pagesFailed, totalPages });
+
+      } else if (scheduleType === 'floorPlans') {
         // ── Floor plan mode: cross-reference with existing ring beam schedule ──
 
         // Beam library comes from the dedicated extractedBeamSchedule lookup,
@@ -256,21 +348,34 @@ export function ScheduleUpload() {
           return;
         }
 
-        console.log('[QS] BEAM SCHEDULE LIBRARY (from state):', beamLibrary);
-        addLog(`Beam library: ${Object.keys(beamLibrary).length} unique marks available (${Object.keys(beamLibrary).join(', ')})`);
+        // Use original mark names (member.name) for the prompt — normalized keys are for lookup only
+        const knownMarks = Object.values(beamLibrary).map(m => m.name).filter(Boolean);
+        console.log('[QS] BEAM SCHEDULE LIBRARY — known marks:', knownMarks);
+        addLog(`Beam library: ${knownMarks.length} mark${knownMarks.length !== 1 ? 's' : ''} (${knownMarks.join(', ')})`);
 
-        // Call Gemini with floor plan prompt
-        const floorBeamMarks = await extractFloorPlanBeams(files, apiKey.trim(), addLog);
+        // Call Gemini — one image per call, verification-based prompt, results merged
+        const { floorBeamMarks, pagesProcessed, pagesFailed, totalPages } = await extractFloorPlanBeams(files, apiKey.trim(), addLog, knownMarks);
         console.log('[QS] FLOOR PLAN RESULT from Gemini:', floorBeamMarks);
+
+        // Positional floor assignment: sort Gemini's floor keys by level, assign to tabs in order.
+        // This handles projects with non-standard floor naming (e.g. First+Roof with no Ground).
+        const sortedFloorKeys = Object.keys(floorBeamMarks)
+          .sort((a, b) => (FLOOR_LEVEL[a] ?? 99) - (FLOOR_LEVEL[b] ?? 99));
+        const positionalMap = Object.fromEntries(
+          sortedFloorKeys.map((key, i) => [key, i < TAB_IDS.length ? TAB_IDS[i] : null])
+        );
+        const sortedLevels = sortedFloorKeys.map(k => `${k}(${FLOOR_LEVEL[k] ?? 99})`);
+        const tabAssignments = sortedFloorKeys.map((k, i) => `${k} → ${positionalMap[k] ?? 'UNMAPPED'}`);
+        console.log('[QS] FLOOR MAPPING:', sortedLevels, '→', tabAssignments);
 
         // Cross-reference marks → full member objects per floor
         const floors = {};
         let skipped = 0;
         for (const [floorKey, marks] of Object.entries(floorBeamMarks)) {
-          const floorId = FLOOR_ID_MAP[floorKey];
+          const floorId = positionalMap[floorKey];
           if (!floorId) {
-            console.warn(`[QS] Unknown floor key from Gemini: "${floorKey}" — skipping. Known keys: ${Object.keys(FLOOR_ID_MAP).join(', ')}`);
-            addLog(`⚠ Gemini returned unknown floor key "${floorKey}" — skipped`);
+            console.warn(`[QS] No tab slot for floor key "${floorKey}" — only ${TAB_IDS.length} floors supported`);
+            addLog(`⚠ No tab for floor "${floorKey}" — only 3 floors supported`);
             continue;
           }
 
@@ -295,7 +400,7 @@ export function ScheduleUpload() {
         const totalMatched = Object.values(floors).reduce((s, arr) => s + arr.length, 0);
         addLog(`✓ Matched ${totalMatched} beam${totalMatched !== 1 ? 's' : ''} across ${Object.keys(floors).length} floor${Object.keys(floors).length !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} mark${skipped !== 1 ? 's' : ''} not found in schedule)` : ''}`);
 
-        setExtracted({ _type: 'floorPlans', floors });
+        setExtracted({ _type: 'floorPlans', floors, pagesProcessed, pagesFailed, totalPages });
 
       } else {
         // ── Normal schedule extraction ──
@@ -317,7 +422,12 @@ export function ScheduleUpload() {
   function handleImport() {
     if (!extracted) return;
 
-    if (extracted._type === 'floorPlans') {
+    if (extracted._type === 'footingLayout') {
+      dispatch({ type: 'SET_FOOTING_QUANTITIES', payload: extracted.counts });
+      dispatch({ type: 'SET_ACTIVE_SECTION', payload: 'footingBoxes' });
+      console.log('[QS] Footing quantities applied:', extracted.counts);
+
+    } else if (extracted._type === 'floorPlans') {
       // Replace each floor tab's members (clears old data, no duplicates on re-run)
       const summary = [];
       for (const [floorId, members] of Object.entries(extracted.floors)) {
@@ -348,6 +458,7 @@ export function ScheduleUpload() {
   }
 
   const isFloorPlans = scheduleType === 'floorPlans';
+  const isFootingLayout = scheduleType === 'footingLayout';
   const selectedType = SCHEDULE_TYPES.find(t => t.id === scheduleType);
 
   return (
@@ -388,7 +499,7 @@ export function ScheduleUpload() {
               }`}
               onClick={() => setScheduleType(t.id)}
             >
-              <span>{t.icon}</span>
+              <span className="flex items-center">{typeof t.icon === 'string' ? t.icon : <t.icon className="w-3.5 h-3.5" />}</span>
               <span>{t.label}</span>
             </button>
           ))}
@@ -398,11 +509,18 @@ export function ScheduleUpload() {
             ? 'AI will attempt to extract all section types from the uploaded drawings.'
             : isFloorPlans
             ? 'AI reads beam marks from each floor plan page and maps them to Ring Beam floor tabs using your already-extracted beam schedule as the source of beam properties.'
+            : isFootingLayout
+            ? 'AI reads the foundation layout plan and counts every physical occurrence of each footing mark, then sets the Qty for each mark in Footing Boxes.'
             : `AI will focus on ${selectedType?.label} only — gives more accurate results.`}
         </p>
         {isFloorPlans && (
           <div className="mt-2 px-3 py-2 bg-amber-950/40 border border-amber-800/50 rounded-lg text-xs text-amber-300">
             <span className="font-semibold">Step 1 first:</span> Switch to Ring Beams type → upload beam schedule drawings → extract &amp; import. Then come back here for Step 2 (floor plans).
+          </div>
+        )}
+        {isFootingLayout && (
+          <div className="mt-2 px-3 py-2 bg-amber-950/40 border border-amber-800/50 rounded-lg text-xs text-amber-300">
+            <span className="font-semibold">Step 1 first:</span> Switch to Footing Schedule type → upload footing schedule → extract &amp; import. Then come back here for Step 2 (Footing Layout).
           </div>
         )}
       </div>
@@ -424,12 +542,14 @@ export function ScheduleUpload() {
         <input ref={inputRef} type="file" className="hidden" accept=".pdf,image/*" multiple onChange={e => pickFiles(e.target.files)} />
         {files.length === 0 ? (
           <>
-            <div className="text-3xl mb-2">{isFloorPlans ? '🗺' : '📐'}</div>
+            <div className="flex justify-center mb-2 text-gray-500">{isFloorPlans || isFootingLayout ? <Map className="w-8 h-8" /> : <Ruler className="w-8 h-8" />}</div>
             <p className="text-sm text-gray-300 font-medium">Drop PDFs or images here</p>
             <p className="text-xs text-gray-500 mt-1">
               {isFloorPlans
                 ? 'Ground floor plan · First floor plan · Roof floor plan'
-                : 'Footing schedule · Column schedule · Beam schedule'}
+                : isFootingLayout
+                ? 'Foundation layout plan'
+                : 'Footing schedule table · Column schedule · Beam schedule'}
             </p>
           </>
         ) : (
@@ -445,7 +565,7 @@ export function ScheduleUpload() {
             </div>
             {files.map((f, i) => (
               <div key={i} className="flex items-center gap-2 text-xs text-gray-300 bg-gray-900/60 rounded-lg px-3 py-1.5">
-                <span>{f.type === 'application/pdf' ? '📄' : '🖼'}</span>
+                <span className="flex items-center">{f.type === 'application/pdf' ? <FileText className="w-3.5 h-3.5" /> : <ImageIcon className="w-3.5 h-3.5" />}</span>
                 <span className="font-medium flex-1 truncate text-left">{f.name}</span>
                 <span className="text-gray-600 flex-shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
                 <button
@@ -476,8 +596,8 @@ export function ScheduleUpload() {
         onClick={handleExtract}
       >
         {loading
-          ? <><span className="animate-spin">⟳</span> {isFloorPlans ? 'Reading floor plans...' : 'Extracting schedules...'}</>
-          : <><span>✦</span> {isFloorPlans ? 'Extract Floor Plans' : 'Extract with Gemini AI'}</>
+          ? <><span className="animate-spin">⟳</span> {isFloorPlans ? 'Reading floor plans...' : isFootingLayout ? 'Counting footings...' : 'Extracting schedules...'}</>
+          : <><Sparkles className="w-4 h-4" /> {isFloorPlans ? 'Extract Floor Plans' : isFootingLayout ? 'Count Footing Quantities' : 'Extract with Gemini AI'}</>
         }
       </button>
 
@@ -494,9 +614,23 @@ export function ScheduleUpload() {
       )}
 
       {/* Confirmation modals */}
+      {extracted?._type === 'footingLayout' && (
+        <FootingLayoutConfirmModal
+          counts={extracted.counts}
+          instancesByMark={extracted.instancesByMark}
+          pagesProcessed={extracted.pagesProcessed}
+          pagesFailed={extracted.pagesFailed}
+          totalPages={extracted.totalPages}
+          onImport={handleImport}
+          onClose={() => setExtracted(null)}
+        />
+      )}
       {extracted?._type === 'floorPlans' && (
         <FloorPlanConfirmModal
           floors={extracted.floors}
+          pagesProcessed={extracted.pagesProcessed}
+          pagesFailed={extracted.pagesFailed}
+          totalPages={extracted.totalPages}
           onImport={handleImport}
           onClose={() => setExtracted(null)}
         />

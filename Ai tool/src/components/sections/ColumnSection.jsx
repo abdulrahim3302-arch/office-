@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 import { useApp, uid } from '../../context/AppContext.jsx';
 import { calcColumn } from '../../utils/calculations.js';
 import { Modal } from '../ui/Modal.jsx';
@@ -160,7 +161,7 @@ function FloorPanel({ floorId }) {
           )}
           <div className="text-xs text-gray-500 pb-2">
             {floorId === 'foundation'
-              ? '⚠ No lap, no concrete for foundation columns'
+              ? <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> No lap, no concrete for foundation columns</span>
               : `Steel height = ${height}m + ${lap}m lap = ${(+height + +lap).toFixed(1)}m`}
           </div>
         </div>
@@ -207,7 +208,7 @@ function FloorPanel({ floorId }) {
                 </div>
                 <button className="btn-ghost text-xs py-1 px-2" onClick={() => { setEditing(member); setShowModal(true); }}>Edit</button>
                 <button className="btn-danger text-xs py-1 px-2"
-                  onClick={() => dispatch({ type: 'DELETE_COLUMN', payload: { floorId, memberId: member.id } })}>✕</button>
+                  onClick={() => dispatch({ type: 'DELETE_COLUMN', payload: { floorId, memberId: member.id } })}><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
 
